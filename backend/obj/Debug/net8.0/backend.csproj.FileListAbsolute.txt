@@ -240,3 +240,4 @@ C:\Users\oussa\Desktop\dotnet\backend\obj\Debug\net8.0\refint\backend.dll
 C:\Users\oussa\Desktop\dotnet\backend\obj\Debug\net8.0\backend.pdb
 C:\Users\oussa\Desktop\dotnet\backend\obj\Debug\net8.0\backend.genruntimeconfig.cache
 C:\Users\oussa\Desktop\dotnet\backend\obj\Debug\net8.0\ref\backend.dll
+C:\Users\oussa\Desktop\dotnet\backend\obj\Debug\net8.0\backend.sourcelink.json

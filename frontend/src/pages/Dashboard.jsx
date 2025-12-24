@@ -21,6 +21,7 @@ const Dashboard = () => {
   const [courses, setCourses] = useState([])
   const [grades, setGrades] = useState([])
   const [loading, setLoading] = useState(true)
+  const [showAllPlanning, setShowAllPlanning] = useState(false)
 
   useEffect(() => {
     const loadDashboard = async () => {
@@ -151,9 +152,8 @@ const Dashboard = () => {
 
   const COLORS = ['#4361ee', '#3f37c9', '#480ca8', '#560bad', '#7209b7', '#b5179e', '#f72585']
 
-  const upcomingClasses = useMemo(() => courses
+  const allUpcomingClasses = useMemo(() => courses
     .filter((c) => c.schedule && c.status === 'Ouvert')
-    .slice(0, 4)
     .map((c) => ({
       course: c.title,
       teacher: c.teacher ? `${c.teacher.firstName} ${c.teacher.lastName}` : 'Non assigné',
@@ -161,6 +161,80 @@ const Dashboard = () => {
       level: c.level,
       code: c.code
     })), [courses])
+
+  const upcomingClasses = allUpcomingClasses.slice(0, 4)
+
+  const performanceStats = useMemo(() => {
+    if (!grades.length) {
+      return {
+        average: 0,
+        averagePercent: 0,
+        bestClass: 'N/A',
+        bestCourse: 'N/A'
+      }
+    }
+
+    // 1. Moyenne globale
+    const scores = grades.filter(g => g.score != null).map(g => g.score)
+    const totalScore = scores.reduce((sum, s) => sum + s, 0)
+    const average = scores.length ? (totalScore / scores.length).toFixed(1) : 0
+    const averagePercent = (average / 20) * 100
+
+    // 2. Meilleure Classe (Niveau)
+    const levelScores = {}
+    grades.forEach(g => {
+      const student = students.find(s => s.id === g.studentId)
+      if (student && student.level && g.score != null) {
+        if (!levelScores[student.level]) {
+          levelScores[student.level] = { sum: 0, count: 0 }
+        }
+        levelScores[student.level].sum += g.score
+        levelScores[student.level].count++
+      }
+    })
+
+    let bestClass = 'N/A';
+    let maxAvg = -1;
+    Object.entries(levelScores).forEach(([level, data]) => {
+      const avg = data.sum / data.count;
+      if (avg > maxAvg) {
+        maxAvg = avg;
+        bestClass = level;
+      }
+    });
+
+    // 3. Top Cours
+    const courseScores = {}
+    grades.forEach(g => {
+      if (g.score != null && g.courseId) {
+        if (!courseScores[g.courseId]) {
+          courseScores[g.courseId] = { sum: 0, count: 0 }
+        }
+        courseScores[g.courseId].sum += g.score
+        courseScores[g.courseId].count++
+      }
+    })
+
+    let bestCourse = 'N/A';
+    let maxCourseAvg = -1;
+    Object.entries(courseScores).forEach(([courseId, data]) => {
+      const avg = data.sum / data.count;
+      if (avg > maxCourseAvg) {
+        maxCourseAvg = avg;
+        const course = courses.find(c => c.id === parseInt(courseId) || c.id === courseId);
+        if (course) {
+          bestCourse = course.title;
+        }
+      }
+    });
+
+    return {
+      average,
+      averagePercent,
+      bestClass,
+      bestCourse
+    }
+  }, [grades, students, courses])
 
   if (loading) return <div className="page-loading">Chargement du tableau de bord...</div>
 
@@ -298,7 +372,7 @@ const Dashboard = () => {
         <article className="card" style={{ border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.03)', padding: '2rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
             <h3 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0 }}>📅 Cours du Jour</h3>
-            <button className="button ghost" style={{ fontSize: '0.85rem' }}>Voir tout</button>
+            <button className="button ghost" style={{ fontSize: '0.85rem' }} onClick={() => setShowAllPlanning(true)}>Voir tout</button>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             {upcomingClasses.map((item, idx) => (
@@ -332,10 +406,10 @@ const Dashboard = () => {
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', fontSize: '0.9rem', fontWeight: 500 }}>
                 <span>Moyenne de l'établissement</span>
-                <span>14.2 / 20</span>
+                <span>{performanceStats.average} / 20</span>
               </div>
               <div style={{ height: '8px', background: 'rgba(255,255,255,0.2)', borderRadius: '4px', overflow: 'hidden' }}>
-                <div style={{ width: '71%', height: '100%', background: 'white', borderRadius: '4px' }}></div>
+                <div style={{ width: `${performanceStats.averagePercent}%`, height: '100%', background: 'white', borderRadius: '4px' }}></div>
               </div>
             </div>
 
@@ -352,16 +426,48 @@ const Dashboard = () => {
             <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
               <div style={{ flex: 1, background: 'rgba(255,255,255,0.1)', padding: '1rem', borderRadius: '0.75rem', backdropFilter: 'blur(10px)' }}>
                 <p style={{ margin: '0 0 0.25rem 0', fontSize: '0.8rem', opacity: 0.8 }}>Meilleure Classe</p>
-                <p style={{ margin: 0, fontWeight: 700, fontSize: '1.1rem' }}>2IIR</p>
+                <p style={{ margin: 0, fontWeight: 700, fontSize: '1.1rem' }}>{performanceStats.bestClass}</p>
               </div>
               <div style={{ flex: 1, background: 'rgba(255,255,255,0.1)', padding: '1rem', borderRadius: '0.75rem', backdropFilter: 'blur(10px)' }}>
                 <p style={{ margin: '0 0 0.25rem 0', fontSize: '0.8rem', opacity: 0.8 }}>Top Cours</p>
-                <p style={{ margin: 0, fontWeight: 700, fontSize: '1.1rem' }}>React JS</p>
+                <p style={{ margin: 0, fontWeight: 700, fontSize: '1.1rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={performanceStats.bestCourse}>{performanceStats.bestCourse}</p>
               </div>
             </div>
           </div>
         </article>
       </section>
+
+      {/* Modal Planning Complet */}
+      {showAllPlanning && (
+        <div className="modal-overlay" onClick={() => setShowAllPlanning(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px' }}>
+            <div className="modal-header">
+              <h3>Planning Complet du Jour</h3>
+              <button className="button ghost" onClick={() => setShowAllPlanning(false)}>✕</button>
+            </div>
+            <div className="modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {allUpcomingClasses.map((item, idx) => (
+                  <div key={`modal-${idx}`} style={{ display: 'flex', alignItems: 'center', padding: '1rem', background: 'var(--gray-50)', borderRadius: '0.75rem', border: '1px solid var(--gray-100)' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0.5rem', background: 'white', borderRadius: '0.5rem', boxShadow: '0 2px 4px rgba(0,0,0,0.02)', marginRight: '1rem', minWidth: '60px' }}>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--gray-500)', fontWeight: 600 }}>{item.time?.split('h')[0]}h</span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--gray-400)' }}>{item.time?.split('h')[1] || '00'}</span>
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '1rem', fontWeight: 600 }}>{item.course}</h4>
+                      <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--gray-500)' }}>{item.teacher} • <span style={{ color: 'var(--primary)', fontWeight: 500 }}>{item.code}</span></p>
+                    </div>
+                    <span className="badge neutral" style={{ background: 'white', border: '1px solid var(--gray-200)' }}>{item.level}</span>
+                  </div>
+                ))}
+                {allUpcomingClasses.length === 0 && (
+                  <p style={{ textAlign: 'center', color: 'var(--gray-500)', padding: '2rem' }}>Aucun cours programmé.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
